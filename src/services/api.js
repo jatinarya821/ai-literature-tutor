@@ -1,6 +1,53 @@
 import axios from 'axios';
 
 const OPEN_LIBRARY_BASE_URL = 'https://openlibrary.org';
+const GROQ_API_URL = '/api/groq';
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_TIMEOUT_MS = 12000;
+
+export const getGroqConfig = () => {
+  const model = localStorage.getItem('groq_model') || DEFAULT_GROQ_MODEL;
+  return { model };
+};
+
+export const generateGroqResponse = async ({ model, systemPrompt, messages }) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.7,
+        max_tokens: 1024,
+        systemPrompt,
+        messages,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorPayload = await response.json().catch(() => null);
+      const errorMessage = errorPayload?.error?.message || `Groq API error (${response.status})`;
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    const text = data?.choices?.[0]?.message?.content?.trim();
+
+    if (!text) {
+      throw new Error('Groq API returned empty response');
+    }
+
+    return text;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 export const searchBooks = async (query) => {
   try {
@@ -11,7 +58,7 @@ export const searchBooks = async (query) => {
       },
       timeout: 5000, // 5 second timeout to prevent hanging
     });
-    
+
     return response.data.docs.map((book) => ({
       id: book.key.replace('/works/', ''),
       title: book.title,
@@ -36,7 +83,7 @@ export const getBookDetails = async (id) => {
   try {
     const response = await axios.get(`${OPEN_LIBRARY_BASE_URL}/works/${id}.json`, { timeout: 5000 });
     const data = response.data;
-    
+
     // Attempt to fetch author details
     let authorName = 'Unknown Author';
     if (data.authors && data.authors.length > 0) {
@@ -48,24 +95,24 @@ export const getBookDetails = async (id) => {
         console.error('Error fetching author details', e);
       }
     }
-    
+
     let description = '';
     if (data.description) {
       description = typeof data.description === 'string' ? data.description : data.description.value;
     }
-    
+
     // Extract characters/people
     let characters = [];
     if (data.subject_people) {
       characters = data.subject_people.slice(0, 10); // Take first 10 characters
     }
-    
+
     // Extract themes/subjects
     let subjects = [];
     if (data.subjects) {
       subjects = data.subjects.slice(0, 15); // Take first 15 subjects
     }
-    
+
     return {
       id: data.key.replace('/works/', ''),
       title: data.title,

@@ -3,6 +3,7 @@ import { Navigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { Library as LibraryIcon, BookmarkX } from 'lucide-react';
 import BookCard from '../components/BookCard';
+import { safeReadJson, safeWriteJson } from '../utils/storage';
 import './Library.css';
 
 const Library = () => {
@@ -11,7 +12,7 @@ const Library = () => {
 
   useEffect(() => {
     if (user) {
-      const books = JSON.parse(localStorage.getItem('library_books') || '[]');
+      const books = safeReadJson('library_books', []);
       setSavedBooks(books);
     }
   }, [user]);
@@ -20,7 +21,7 @@ const Library = () => {
     e.preventDefault(); // Prevent navigating to book details if wrapped in a Link (handled in BookCard conceptually, but here we can add a remove button over the card or just a simple list)
     const newBooks = savedBooks.filter(book => book.id !== id);
     setSavedBooks(newBooks);
-    localStorage.setItem('library_books', JSON.stringify(newBooks));
+    safeWriteJson('library_books', newBooks);
   };
 
   if (!user) {

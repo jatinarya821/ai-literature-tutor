@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect } from 'react';
+import { safeReadJson, safeWriteJson } from '../utils/storage';
 
 export const AuthContext = createContext();
 
@@ -7,9 +8,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     // Check if user is logged in
-    const storedUser = localStorage.getItem('user');
+    const storedUser = safeReadJson('user', null);
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      setUser(storedUser);
     }
   }, []);
 
@@ -17,7 +18,7 @@ export const AuthProvider = ({ children }) => {
     // Mock login
     const newUser = { email, name: email.split('@')[0] };
     setUser(newUser);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    safeWriteJson('user', newUser);
   };
 
   const logout = () => {

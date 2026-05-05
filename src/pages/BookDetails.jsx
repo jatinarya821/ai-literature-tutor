@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Send, Bot, User, Loader2, Bookmark, BookmarkCheck, Download, Sparkles } from 'lucide-react';
-import { getBookDetails } from '../services/api';
+import { getBookDetails, getGroqConfig, generateGroqResponse } from '../services/api';
+import { safeReadJson, safeWriteJson } from '../utils/storage';
 import { AuthContext } from '../context/AuthContext';
 import './BookDetails.css';
+
+const MAX_CHAT_HISTORY = 12;
 
 const BookDetails = () => {
   const { id } = useParams();
@@ -12,7 +15,7 @@ const BookDetails = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [isSaved, setIsSaved] = useState(false);
-  
+
   // Chat state
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -45,7 +48,7 @@ const BookDetails = () => {
 
   useEffect(() => {
     if (user && book) {
-      const savedBooks = JSON.parse(localStorage.getItem('library_books') || '[]');
+      const savedBooks = safeReadJson('library_books', []);
       setIsSaved(savedBooks.some(b => b.id === book.id));
     }
   }, [user, book]);
@@ -55,15 +58,15 @@ const BookDetails = () => {
       navigate('/login');
       return;
     }
-    
-    const savedBooks = JSON.parse(localStorage.getItem('library_books') || '[]');
+
+    const savedBooks = safeReadJson('library_books', []);
     if (isSaved) {
       const newBooks = savedBooks.filter(b => b.id !== book.id);
-      localStorage.setItem('library_books', JSON.stringify(newBooks));
+      safeWriteJson('library_books', newBooks);
       setIsSaved(false);
     } else {
       savedBooks.push(book);
-      localStorage.setItem('library_books', JSON.stringify(savedBooks));
+      safeWriteJson('library_books', savedBooks);
       setIsSaved(true);
     }
   };
@@ -92,103 +95,135 @@ const BookDetails = () => {
     setInputMessage('');
     setIsTyping(true);
 
+    const groqConfig = getGroqConfig();
+    const historyLimit = Math.max(0, MAX_CHAT_HISTORY - 1);
+    const recentMessages = messages.slice(-historyLimit).map(m => ({
+      role: m.sender === 'bot' ? 'assistant' : 'user',
+      content: m.text
+    }));
+
     try {
-      // Create chat history for true conversational AI
-      const apiMessages = messages.map(m => ({
-        role: m.sender === 'bot' ? 'assistant' : 'user',
-        content: m.text
-      }));
+      let botResponse = '';
 
-      // System Prompt injecting the exact Book Context
-      const systemPrompt = `You are an expert AI Literature Tutor. The user is currently studying the book "${book.title}" by ${book.author}. You must act as a highly intelligent, conversational tutor. If the user asks for a quiz, you MUST generate exactly 10 challenging multiple-choice questions about the book's themes, characters, and plot. Give all 10 questions at once, and wait for the user to reply with their answers before grading them. Do not use large markdown headers.`;
+      if (groqConfig) {
+        // Deep AI Mode active: Use Groq
+        const systemPrompt = `You are an expert AI Literature Tutor. The user is currently studying the book "${book.title}" by ${book.author}. Act as a highly intelligent, conversational professor. If the user asks for a summary, give a thorough, comprehensive plot overview or chapter-by-chapter breakdown. Ensure your answers are highly detailed and analytical. If the user asks for a quiz, generate exactly 10 challenging multiple-choice questions about the book.`;
 
-      apiMessages.unshift({ role: 'system', content: systemPrompt });
-      apiMessages.push({ role: 'user', content: text });
-      
-      // Create an AbortController to set a strict 6-second timeout for the AI
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+        const apiMessages = [
+          ...recentMessages,
+          { role: 'user', content: text }
+        ];
 
-      const response = await fetch(`https://text.pollinations.ai/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        botResponse = await generateGroqResponse({
+          model: groqConfig.model,
+          systemPrompt,
           messages: apiMessages
-        }),
-        signal: controller.signal
-      });
-      
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
+        });
+      } else {
+        // Free Mode: Use Pollinations AI (Original behavior)
+        const apiMessages = [
+          ...recentMessages,
+          { role: 'user', content: text }
+        ];
+
+        // System Prompt injecting the exact Book Context
+        const systemPrompt = `You are an expert AI Literature Tutor. The user is currently studying the book "${book.title}" by ${book.author}. You must act as a highly intelligent, conversational tutor. If the user asks for a quiz, you MUST generate exactly 10 challenging multiple-choice questions about the book's themes, characters, and plot. Give all 10 questions at once, and wait for the user to reply with their answers before grading them. Do not use large markdown headers.`;
+
+        apiMessages.unshift({ role: 'system', content: systemPrompt });
+
+        // Create an AbortController to set a strict 6-second timeout for the AI
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+        const response = await fetch(`https://text.pollinations.ai/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: apiMessages
+          }),
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+
+        botResponse = await response.text();
+
+        clearTimeout(timeoutId); // Clear timeout ONLY after full text is received!
+
+        // Clean up the Pollinations API deprecation notice
+        botResponse = botResponse.replace(/⚠️ \*\*IMPORTANT NOTICE\*\* ⚠️[\s\S]*?will continue to work normally\./i, '').trim();
       }
-      
-      let botResponse = await response.text();
-      
-      clearTimeout(timeoutId); // Clear timeout ONLY after full text is received!
-      
-      // Clean up the Pollinations API deprecation notice
-      botResponse = botResponse.replace(/⚠️ \*\*IMPORTANT NOTICE\*\* ⚠️[\s\S]*?will continue to work normally\./i, '').trim();
-      
+
       // If the API returned nothing or just a warning, force the Fallback Engine!
       if (!botResponse) {
         throw new Error('AI returned an empty response');
       }
 
       setMessages(prev => [
-        ...prev, 
+        ...prev,
         { id: Date.now() + 1, sender: 'bot', text: botResponse }
       ]);
     } catch (error) {
-      console.warn('AI Error (Fallback Engaged):', error.message);
-      
-      // Bulletproof Fallback: Smart Keyword Engine
+      console.warn('AI Error:', error.message);
+
       let fallbackResponse = '';
-      const lowerInput = text.toLowerCase();
-      
-      if (lowerInput.includes('quiz')) {
-        fallbackResponse = `Let's test your knowledge on ${book.title}!\n\nQuestion: Which of the following best describes the core internal conflict of the protagonist?\nA) The struggle against an oppressive society.\nB) The battle between personal desire and moral duty.\nC) The quest for material wealth.\n\n(Reply with A, B, or C!)`;
-      }
-      else if (['a', 'b', 'c', 'a)', 'b)', 'c)'].includes(lowerInput.trim())) {
-        fallbackResponse = `Good attempt! In literary analysis, this answer highlights the profound thematic depth the author intended. Understanding this character motivation is key to mastering the book!`;
-      }
-      else if (lowerInput.includes('summar') || lowerInput.includes('plot') || lowerInput.includes('story') || lowerInput.includes('about')) {
-        if (book.description && book.description !== 'No description available for this book.') {
-          const shortSummary = book.description.substring(0, 300) + (book.description.length > 300 ? '...' : '');
-          fallbackResponse = `Certainly! Here is a brief summary of ${book.title}: "${shortSummary}". Does this premise interest you?`;
-        } else {
-          fallbackResponse = `Unfortunately, the Open Library database doesn't have a full summary available for ${book.title}, but it is a well-known work by ${book.author}.`;
+      const isGroqEnabled = !!groqConfig;
+
+      // If Groq Mode is ON but it failed, tell the user WHY it failed so they can fix it.
+      if (isGroqEnabled) {
+        fallbackResponse = `⚠️ **Groq AI Error:** ${error.message}\n\nPlease ensure the local API server is running and GROQ_API_KEY is set on the server. Then refresh the page and try again.`;
+      } else {
+        // Bulletproof Fallback: Smart Keyword Engine (Free Mode)
+        const lowerInput = text.toLowerCase();
+
+        if (lowerInput.includes('quiz')) {
+          fallbackResponse = `Let's test your knowledge on ${book.title}!\n\nQuestion: Which of the following best describes the core internal conflict of the protagonist?\nA) The struggle against an oppressive society.\nB) The battle between personal desire and moral duty.\nC) The quest for material wealth.\n\n(Reply with A, B, or C!)`;
         }
-      } 
-      else if (lowerInput.includes('char') || lowerInput.includes('role')) {
-        if (book.characters && book.characters.length > 0) {
-          const charList = book.characters.map(c => `\n• ${c.name || c}`).slice(0, 8).join('');
-          fallbackResponse = `The main characters in ${book.title} include:${charList}\n\nEach of them plays a specific role that drives the narrative forward. Whose role did you find the most interesting?`;
-        } else {
-          fallbackResponse = `In ${book.title}, the characters play pivotal roles in driving the themes. The protagonist's journey directly reflects ${book.author}'s main message. Who is your favorite character so far?`;
+        else if (['a', 'b', 'c', 'a)', 'b)', 'c)'].includes(lowerInput.trim())) {
+          fallbackResponse = `Good attempt! In literary analysis, this answer highlights the profound thematic depth the author intended. Understanding this character motivation is key to mastering the book!`;
         }
-      }
-      else if (lowerInput.includes('author') || lowerInput.includes('written') || lowerInput.includes('who wrote')) {
-        fallbackResponse = `This brilliant piece was written by ${book.author}. Their unique writing style significantly influenced the literary world during their time. Have you read any other books by them?`;
-      }
-      else if (lowerInput.includes('theme') || lowerInput.includes('symbol')) {
-        if (book.subjects && book.subjects.length > 0) {
-          const themeList = book.subjects.filter(s => typeof s === 'string' && !s.toLowerCase().includes('protected')).slice(0, 6).join(', ');
-          fallbackResponse = `Great topic! Based on literary classification, the core themes and motifs in ${book.title} revolve around: ${themeList}. The author uses these concepts to drive the narrative and build emotional depth. Which of these themes stands out to you the most?`;
-        } else {
-          fallbackResponse = `Great topic! ${book.title} is rich with symbolism. The recurring motifs often represent the protagonist's isolation and the shifting societal values of the era. How do you interpret the recurring imagery?`;
+        else if (lowerInput.includes('summar') || lowerInput.includes('plot') || lowerInput.includes('story') || lowerInput.includes('about')) {
+          if (book.description && book.description !== 'No description available for this book.') {
+            const shortSummary = book.description.substring(0, 300) + (book.description.length > 300 ? '...' : '');
+            fallbackResponse = `Certainly! Here is a brief summary of ${book.title}: "${shortSummary}". Does this premise interest you?`;
+          } else {
+            fallbackResponse = `Unfortunately, the Open Library database doesn't have a full summary available for ${book.title}, but it is a well-known work by ${book.author}.`;
+          }
         }
-      }
-      else {
-        const responses = [
-          `That's a fascinating perspective on "${book?.title}". The author often uses that motif to reflect broader societal changes. What do you think motivated the protagonist in that specific scene?`,
-          `Indeed! The thematic depth in ${book?.author}'s work is remarkable. If we compare this to other works of the era, we see a distinct departure from traditional narrative structures.`,
-          `Great question. The symbolism here is multi-layered. Often, it represents the internal conflict of the characters. How did you interpret the ending?`
-        ];
-        fallbackResponse = responses[Math.floor(Math.random() * responses.length)];
-      }
+        else if (lowerInput.includes('char') || lowerInput.includes('role')) {
+          if (book.characters && book.characters.length > 0) {
+            const charList = book.characters.map(c => `\n• ${c.name || c}`).slice(0, 8).join('');
+            fallbackResponse = `The main characters in ${book.title} include:${charList}\n\nEach of them plays a specific role that drives the narrative forward. Whose role did you find the most interesting?`;
+          } else {
+            fallbackResponse = `In ${book.title}, the characters play pivotal roles in driving the themes. The protagonist's journey directly reflects ${book.author}'s main message. Who is your favorite character so far?`;
+          }
+        }
+        else if (lowerInput.includes('author') || lowerInput.includes('written') || lowerInput.includes('who wrote')) {
+          fallbackResponse = `This brilliant piece was written by ${book.author}. Their unique writing style significantly influenced the literary world during their time. Have you read any other books by them?`;
+        }
+        else if (lowerInput.includes('theme') || lowerInput.includes('symbol')) {
+          if (book.subjects && book.subjects.length > 0) {
+            const themeList = book.subjects.filter(s => typeof s === 'string' && !s.toLowerCase().includes('protected')).slice(0, 6).join(', ');
+            fallbackResponse = `Great topic! Based on literary classification, the core themes and motifs in ${book.title} revolve around: ${themeList}. The author uses these concepts to drive the narrative and build emotional depth. Which of these themes stands out to you the most?`;
+          } else {
+            fallbackResponse = `Great topic! ${book.title} is rich with symbolism. The recurring motifs often represent the protagonist's isolation and the shifting societal values of the era. How do you interpret the recurring imagery?`;
+          }
+        }
+        else {
+          const responses = [
+            `That's a fascinating perspective on "${book?.title}". The author often uses that motif to reflect broader societal changes. What do you think motivated the protagonist in that specific scene?`,
+            `Indeed! The thematic depth in ${book?.author}'s work is remarkable. If we compare this to other works of the era, we see a distinct departure from traditional narrative structures.`,
+            `Great question. The symbolism here is multi-layered. Often, it represents the internal conflict of the characters. How did you interpret the ending?`
+          ];
+          fallbackResponse = responses[Math.floor(Math.random() * responses.length)];
+        }
+
+      } // End of Free Mode Fallback
 
       setMessages(prev => [
-        ...prev, 
+        ...prev,
         { id: Date.now() + 1, sender: 'bot', text: fallbackResponse }
       ]);
     } finally {
@@ -225,8 +260,8 @@ const BookDetails = () => {
           <ArrowLeft size={20} />
           <span>Back to Search</span>
         </Link>
-        <button 
-          className={`btn ${isSaved ? 'btn-secondary' : 'btn-primary'}`} 
+        <button
+          className={`btn ${isSaved ? 'btn-secondary' : 'btn-primary'}`}
           onClick={handleSaveBook}
         >
           {isSaved ? (
@@ -255,7 +290,7 @@ const BookDetails = () => {
             <div className="description-box">
               <h3 className="heading-sm mb-2">Synopsis</h3>
               <p className="text-muted">{book.description}</p>
-              
+
               {book.characters && book.characters.length > 0 && (
                 <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
                   <h3 className="heading-sm mb-2">Notable Characters</h3>

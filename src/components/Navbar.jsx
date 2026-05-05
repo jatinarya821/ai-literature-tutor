@@ -14,11 +14,16 @@ const Navbar = () => {
   };
 
   const handleSettings = () => {
-    const currentKey = localStorage.getItem('gemini_api_key') || '';
-    const newKey = window.prompt('Enter your Gemini API Key to enable Deep AI Mode (Real Intelligence):', currentKey);
-    if (newKey !== null) {
-      localStorage.setItem('gemini_api_key', newKey.trim());
-      alert('API Key saved! Deep AI Mode is now active.');
+    const currentModel = localStorage.getItem('groq_model') || '';
+    const newModel = window.prompt('Enter Groq model (leave blank for default):', currentModel);
+    if (newModel !== null) {
+      const trimmedModel = newModel.trim();
+      if (trimmedModel) {
+        localStorage.setItem('groq_model', trimmedModel);
+      } else {
+        localStorage.removeItem('groq_model');
+      }
+      alert('Model preference saved. API key is configured on the server.');
     }
   };
 
@@ -37,6 +42,11 @@ const Navbar = () => {
         <ul className="nav-links">
           <li><Link to="/" className="nav-link">Home</Link></li>
           <li><Link to="/library" className="nav-link">My Library</Link></li>
+          <li>
+            <button className="nav-link" onClick={handleSettings} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Settings size={18} /> Settings
+            </button>
+          </li>
           {user ? (
             <li>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
