@@ -8,17 +8,20 @@
   border-left: none;
   border-right: none;
   border-top: none;
-  background: rgba(10, 10, 15, 0.7);
+  background: rgba(10, 10, 15, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .nav-container {
-  height: 80px;
+  height: 70px;
 }
 
 .nav-brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  z-index: 1010;
 }
 
 .brand-icon {
@@ -45,6 +48,7 @@
   letter-spacing: -0.03em;
 }
 
+/* ===== Desktop Nav Links ===== */
 .nav-links {
   display: flex;
   align-items: center;
@@ -75,4 +79,245 @@
 
 .nav-link:hover::after {
   width: 100%;
+}
+
+.nav-link-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: inherit;
+  padding: 0;
+}
+
+.nav-user-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.nav-user-name {
+  gap: 0.5rem;
+}
+
+.nav-logout-btn {
+  padding: 0.5rem 1rem;
+}
+
+/* ===== Hamburger toggle — hidden on desktop ===== */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  padding: 0.5rem;
+  z-index: 1010;
+  cursor: pointer;
+}
+
+/* ===== Mobile shortcut icons — hidden on desktop ===== */
+.nav-mobile-shortcuts {
+  display: none;
+  align-items: center;
+  gap: 0.25rem;
+  z-index: 1010;
+}
+
+.mobile-shortcut-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  color: var(--text-secondary);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  transition: var(--transition);
+}
+
+.mobile-shortcut-btn:hover,
+.mobile-shortcut-btn:active {
+  color: var(--accent-primary);
+  background: rgba(124, 58, 237, 0.15);
+  border-color: rgba(124, 58, 237, 0.35);
+  box-shadow: 0 0 12px rgba(124, 58, 237, 0.2);
+}
+
+/* Profile initial avatar in mobile shortcuts */
+.mobile-profile-btn {
+  background: var(--accent-gradient);
+  border-color: rgba(192, 38, 211, 0.3);
+  color: white;
+}
+
+.mobile-profile-btn:hover,
+.mobile-profile-btn:active {
+  color: white;
+  background: var(--accent-gradient);
+  border-color: rgba(192, 38, 211, 0.5);
+  box-shadow: 0 0 14px rgba(192, 38, 211, 0.3);
+}
+
+.mobile-profile-initial {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ===== Mobile Menu (portaled to body) ===== */
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  background: rgba(0, 0, 0, 0.5);
+  animation: navFadeIn 0.2s ease;
+}
+
+.nav-mobile-menu {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  z-index: 1060;
+  background: rgba(10, 10, 15, 0.98);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  padding: 0.5rem 0;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  list-style: none;
+  animation: navSlideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nav-mobile-item {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 2rem;
+  width: 100%;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.nav-mobile-item:hover {
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--text-primary);
+}
+
+.nav-mobile-menu li {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.nav-mobile-menu li:last-child {
+  border-bottom: none;
+}
+
+/* Logout link — red accent */
+.nav-mobile-item--danger {
+  color: #ef4444;
+}
+
+.nav-mobile-item--danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+}
+
+/* Sign-in link — purple accent */
+.nav-mobile-item--accent {
+  color: var(--accent-primary);
+  font-weight: 600;
+}
+
+.nav-mobile-item--accent:hover {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+@keyframes navFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes navSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== Mobile Breakpoint: 768px ===== */
+@media (max-width: 768px) {
+  .nav-container {
+    height: 60px;
+  }
+
+  /* Allow dropdown to extend beyond navbar bounds */
+  .navbar {
+    overflow: visible !important;
+  }
+
+  .brand-text {
+    font-size: 1.25rem;
+  }
+
+  .brand-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .nav-mobile-shortcuts {
+    display: flex;
+  }
+
+  .menu-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Hide desktop nav links on mobile */
+  .nav-links {
+    display: none !important;
+  }
+}
+
+/* ===== Small phone: 480px ===== */
+@media (max-width: 480px) {
+  .nav-container {
+    padding: 0 1rem;
+  }
+
+  .brand-text {
+    font-size: 1.1rem;
+  }
+
+  .brand-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .mobile-shortcut-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .nav-mobile-item {
+    padding: 0.85rem 1.5rem;
+    font-size: 1rem;
+  }
 }

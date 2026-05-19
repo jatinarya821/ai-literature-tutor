@@ -12,7 +12,7 @@ function App() {
       <Router>
         <div className="app-container">
           <Navbar />
-          <main className="container" style={{ padding: '2rem 1rem', marginTop: '80px' }}>
+          <main className="container main-content">
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/book/:id" element={<BookDetails />} />

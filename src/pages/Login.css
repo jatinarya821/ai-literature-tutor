@@ -81,3 +81,49 @@
 .login-footer a {
   font-weight: 600;
 }
+
+/* ===== Mobile: 768px ===== */
+@media (max-width: 768px) {
+  .login-container {
+    min-height: calc(100vh - 120px);
+    padding: 1rem;
+  }
+
+  .login-box {
+    padding: 2rem 1.5rem;
+    border-radius: 20px;
+    max-width: 100%;
+  }
+
+  .login-header {
+    margin-bottom: 2rem;
+  }
+
+  .login-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+  }
+}
+
+/* ===== Small phone: 480px ===== */
+@media (max-width: 480px) {
+  .login-box {
+    padding: 1.5rem 1.25rem;
+    border-radius: 16px;
+  }
+
+  .login-form {
+    gap: 1.25rem;
+  }
+
+  .input-wrapper input {
+    padding: 0.85rem 0.85rem 0.85rem 2.75rem;
+    font-size: 0.95rem;
+  }
+
+  .login-submit-btn {
+    padding: 0.85rem;
+    font-size: 1rem;
+  }
+}
