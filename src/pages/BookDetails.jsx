@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useContext } from 'react';
+import { useState, useEffect, useRef, useContext, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Send, Bot, User, Loader2, Bookmark, BookmarkCheck, Download, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Bot, User, Loader2, Bookmark, BookmarkCheck, Download, Sparkles, Maximize2, X } from 'lucide-react';
 import { getBookDetails, getGroqConfig, generateGroqResponse } from '../services/api';
 import { safeReadJson, safeWriteJson } from '../utils/storage';
 import { AuthContext } from '../context/AuthContext';
@@ -20,7 +21,24 @@ const BookDetails = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isChatFullscreen, setIsChatFullscreen] = useState(false);
   const messagesEndRef = useRef(null);
+
+  // Toggle fullscreen mode
+  const toggleFullscreen = useCallback(() => {
+    setIsChatFullscreen(prev => !prev);
+  }, []);
+
+  // Close fullscreen on Escape key
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape' && isChatFullscreen) {
+        setIsChatFullscreen(false);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isChatFullscreen]);
 
   useEffect(() => {
     const fetchBook = async () => {
@@ -321,72 +339,97 @@ const BookDetails = () => {
         </div>
 
         {/* AI Tutor Chat Column */}
-        <div className="tutor-chat-col glass-panel">
-          <div className="chat-header">
-            <div className="flex-between" style={{ width: '100%' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                <div className="tutor-avatar flex-center">
-                  <Bot size={24} color="#fff" />
-                </div>
-                <div>
-                  <h2 className="heading-md" style={{ fontSize: '1.2rem' }}>LitTutor AI</h2>
-                  <span className="status-indicator">Online</span>
+        {(() => {
+          const chatPanel = (
+            <div className={`tutor-chat-col glass-panel ${isChatFullscreen ? 'chat-fullscreen' : ''}`}>
+              <div className="chat-header">
+                <div className="flex-between" style={{ width: '100%' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <div className="tutor-avatar flex-center">
+                      <Bot size={24} color="#fff" />
+                    </div>
+                    <div>
+                      <h2 className="heading-md" style={{ fontSize: '1.2rem' }}>LitTutor AI</h2>
+                      <span className="status-indicator">Online</span>
+                    </div>
+                  </div>
+                  <div className="chat-header-controls">
+                    <button className="btn btn-secondary" onClick={handleExportChat} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} title="Export Study Notes">
+                      <Download size={16} /> Export
+                    </button>
+                    {isChatFullscreen ? (
+                      <button className="btn chat-close-btn" onClick={toggleFullscreen} title="Exit Fullscreen">
+                        <X size={18} /> Close
+                      </button>
+                    ) : (
+                      <button className="btn btn-secondary chat-fullscreen-btn" onClick={toggleFullscreen} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} title="Fullscreen Chat">
+                        <Maximize2 size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-              <button className="btn btn-secondary" onClick={handleExportChat} style={{ padding: '0.4rem 0.8rem', fontSize: '0.85rem' }} title="Export Study Notes">
-                <Download size={16} /> Export
-              </button>
-            </div>
-          </div>
 
-          <div className="chat-messages">
-            {messages.map((msg) => (
-              <div key={msg.id} className={`message ${msg.sender === 'bot' ? 'message-bot' : 'message-user'}`}>
-                <div className="message-avatar flex-center">
-                  {msg.sender === 'bot' ? <Bot size={18} /> : <User size={18} />}
-                </div>
-                <div className="message-content">
-                  <p>{msg.text}</p>
-                </div>
+              <div className="chat-messages">
+                {messages.map((msg) => (
+                  <div key={msg.id} className={`message ${msg.sender === 'bot' ? 'message-bot' : 'message-user'}`}>
+                    <div className="message-avatar flex-center">
+                      {msg.sender === 'bot' ? <Bot size={18} /> : <User size={18} />}
+                    </div>
+                    <div className="message-content">
+                      <p>{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+                {isTyping && (
+                  <div className="message message-bot">
+                    <div className="message-avatar flex-center"><Bot size={18} /></div>
+                    <div className="message-content typing-indicator">
+                      <span></span><span></span><span></span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-            ))}
-            {isTyping && (
-              <div className="message message-bot">
-                <div className="message-avatar flex-center"><Bot size={18} /></div>
-                <div className="message-content typing-indicator">
-                  <span></span><span></span><span></span>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
 
-          <div className="chat-input-container">
-            <div className="quick-prompts">
-              <button type="button" className="prompt-pill" onClick={() => submitMessage('What are the core themes?')}>
-                <Sparkles size={14} /> Themes
-              </button>
-              <button type="button" className="prompt-pill" onClick={() => submitMessage('Analyze the symbolism in this book.')}>
-                <Sparkles size={14} /> Symbolism
-              </button>
-              <button type="button" className="prompt-pill" onClick={() => submitMessage('Quiz me on this book!')}>
-                Quiz Me!
-              </button>
+              <div className="chat-input-container">
+                <div className="quick-prompts">
+                  <button type="button" className="prompt-pill" onClick={() => submitMessage('What are the core themes?')}>
+                    <Sparkles size={14} /> Themes
+                  </button>
+                  <button type="button" className="prompt-pill" onClick={() => submitMessage('Analyze the symbolism in this book.')}>
+                    <Sparkles size={14} /> Symbolism
+                  </button>
+                  <button type="button" className="prompt-pill" onClick={() => submitMessage('Quiz me on this book!')}>
+                    Quiz Me!
+                  </button>
+                </div>
+                <form className="chat-input-area" onSubmit={handleSendMessage}>
+                  <input
+                    type="text"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    placeholder="Ask a question or select a prompt..."
+                    className="chat-input"
+                  />
+                  <button type="submit" className="send-btn" disabled={!inputMessage.trim()}>
+                    <Send size={20} />
+                  </button>
+                </form>
+              </div>
             </div>
-            <form className="chat-input-area" onSubmit={handleSendMessage}>
-              <input
-                type="text"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="Ask a question or select a prompt..."
-                className="chat-input"
-              />
-              <button type="submit" className="send-btn" disabled={!inputMessage.trim()}>
-                <Send size={20} />
-              </button>
-            </form>
-          </div>
-        </div>
+          );
+
+          return isChatFullscreen
+            ? createPortal(
+                <>
+                  <div className="chat-fullscreen-backdrop" onClick={toggleFullscreen} />
+                  {chatPanel}
+                </>,
+                document.body
+              )
+            : chatPanel;
+        })()}
       </div>
     </div>
   );

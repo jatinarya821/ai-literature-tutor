@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { BookOpen, GraduationCap, User, LogOut, Settings } from 'lucide-react';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
+import { isProbablyGroqApiKey } from '../services/api';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -19,6 +20,10 @@ const Navbar = () => {
     if (newModel !== null) {
       const trimmedModel = newModel.trim();
       if (trimmedModel) {
+        if (isProbablyGroqApiKey(trimmedModel)) {
+          alert('That looks like a Groq API key. Please enter a model name instead.');
+          return;
+        }
         localStorage.setItem('groq_model', trimmedModel);
       } else {
         localStorage.removeItem('groq_model');

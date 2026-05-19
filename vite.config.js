@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:8787',
+        target: 'https://ai-literature-tutor.vercel.app/',
         changeOrigin: true,
       },
     },

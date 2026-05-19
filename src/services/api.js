@@ -5,8 +5,22 @@ const GROQ_API_URL = '/api/groq';
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROQ_TIMEOUT_MS = 12000;
 
+export const isProbablyGroqApiKey = (value) =>
+  typeof value === 'string' && value.trim().startsWith('gsk_');
+
+const normalizeGroqModel = (value) => {
+  const trimmed = typeof value === 'string' ? value.trim() : '';
+  if (!trimmed || isProbablyGroqApiKey(trimmed)) {
+    if (trimmed && typeof localStorage !== 'undefined') {
+      localStorage.removeItem('groq_model');
+    }
+    return DEFAULT_GROQ_MODEL;
+  }
+  return trimmed;
+};
+
 export const getGroqConfig = () => {
-  const model = localStorage.getItem('groq_model') || DEFAULT_GROQ_MODEL;
+  const model = normalizeGroqModel(localStorage.getItem('groq_model'));
   return { model };
 };
 
