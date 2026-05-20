@@ -29,6 +29,18 @@ const BookDetails = () => {
     setIsChatFullscreen(prev => !prev);
   }, []);
 
+  // Lock body scroll when fullscreen to prevent mobile UI shifts
+  useEffect(() => {
+    if (isChatFullscreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isChatFullscreen]);
+
   // Close fullscreen on Escape key
   useEffect(() => {
     const handleEsc = (e) => {
