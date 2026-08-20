@@ -1,5 +1,6 @@
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+
+const DEFAULT_MODEL = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
 
 const sendJson = (res, status, payload) => {
   res.status(status).json(payload);
@@ -27,7 +28,7 @@ export default async function handler(req, res) {
     }
   }
 
-  const { messages, systemPrompt, model, temperature, max_tokens } = body || {};
+  const { messages, systemPrompt, model, temperature, max_completion_tokens, max_tokens } = body || {};
   if (!Array.isArray(messages)) {
     sendJson(res, 400, { error: { message: 'messages must be an array' } });
     return;
@@ -36,7 +37,7 @@ export default async function handler(req, res) {
   const upstreamBody = {
     model: model || DEFAULT_MODEL,
     temperature: typeof temperature === 'number' ? temperature : 0.7,
-    max_tokens: typeof max_tokens === 'number' ? max_tokens : 1024,
+    max_completion_tokens: typeof max_completion_tokens === 'number' ? max_completion_tokens : (typeof max_tokens === 'number' ? max_tokens : 2048),
     messages: [
       ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
       ...messages,

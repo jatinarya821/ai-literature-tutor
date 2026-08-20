@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const OPEN_LIBRARY_BASE_URL = 'https://openlibrary.org';
 const GROQ_API_URL = '/api/groq';
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile';
+const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_TIMEOUT_MS = 12000;
 
 export const isProbablyGroqApiKey = (value) =>
@@ -37,7 +37,7 @@ export const generateGroqResponse = async ({ model, systemPrompt, messages }) =>
       body: JSON.stringify({
         model,
         temperature: 0.7,
-        max_tokens: 1024,
+        max_completion_tokens: 2048,
         systemPrompt,
         messages,
       }),
